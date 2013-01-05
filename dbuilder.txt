@@ -1,0 +1,380 @@
+dbuilder.py -- build stand-alone Django projects
+================================================
+Stuart Rackham <srackham@methods.co.nz>
+v0.7.0, April 2008
+
+`dbuilder.py` is a Python utility that will take your Django project
+and marshal the required files to create a stand-alone distribution.
+You have the option of including Python and Django runtimes in the
+distribution and you also have the option of packaging the
+distribution into either a Windows setup wizard using Inno Setup or a
+tarball file.
+
+dbuilder.py command
+-------------------
+Run `python dbuilder.py --help` for help with program options:
+
+---------------------------------------------------------------------
+Usage: dbuilder.py [OPTIONS] PROJECT_DIR
+
+Build a self contained Win32 distribution for the Django project in the
+PROJECT_DIR. Optionally build Python and Django runtimes. Distribution files
+are written to DIST_DIR directory (default 'PROJECT_DIR/dist'). Python runtime
+written to 'DIST_DIR/python'. Django runtime written to 'DIST_DIR/django'.
+
+Options:
+  --version             show program's version number and exit
+  -h, --help            show this help message and exit
+  -d DIST_DIR, --dist-dir=DIST_DIR
+                        distribution destination directory
+  -f CONF_FILE, --conf-file=CONF_FILE
+                        configuration file
+  -p, --python-runtime  copy a Python runtime from PYTHON_DIR
+  -j, --django-runtime  copy a Django runtime from DJANGO_DIR
+  -c, --compile         distribute compiled .pyc files
+  -i ISS_FILE, --iss-file=ISS_FILE
+                        create install wizard using Inno Setup compiler
+  -t TARBALL_FILE, --tarball=TARBALL_FILE
+                        create TARBALL_FILE of distribution directory
+  -m, --manifest        write MANIFEST file and exit
+  -C, --check-manifest  check distribution against MANIFEST file and exit
+  -n, --dry-run         show what would have been done
+  -v, --verbose         increase verbosity
+---------------------------------------------------------------------
+
+.Notes
+- If a configuration file is not specified with the `--conf-file`
+  option and if a configuration file named `dbuilder.conf` is in the
+  `PROJECT_DIR` directory then it is loaded.
+- The target areas of the `./dist` distribution directory are cleared
+  before files are copied.
+- Project files are copied to the `./dist` distribution directory.
+- If the `--python-runtime` option is specified the Python runtime
+  files are copied to `./dist/python` using the configuration
+  `PYTHON_COPY_FILES` <<X5,match list>>.
+- If the `--django-runtime` option is specified the Django runtime
+  files are copied to `./dist/django` using the configuration
+  `DJANGO_COPY_FILES` <<X5,match list>>.
+- You normally won't need to use the `--django-runtime` or
+  `--python-runtime` options again unless you update either Python or
+  Django.
+- Directory and file names starting with a period character are not
+  copied (so your Mercurial or Subversion repo meta data does not get
+  copied).
+- Symlinks (UNIX only) are skipped.
+- No `.pyc`, `.pyo` files are copied.
+- If the `--iss-file=ISS_FILE` option is specified then the Inno Setup
+  script `ISS_FILE` is used by the Inno Setup Compiler to create a
+  installer wizard.
+- If the `ISS_FILE` option value is `-` then the `ISS_FILE`
+  configuration parameter value is used, if it is a relative file name
+  then it is assumed relative to the `PROJECT_DIR`.
+- The default `ISS_FILE` configuration parameter value is
+  `./setup/setup.iss`.
+- If the `--tarball=TARBALL_FILE` option is specified then a tarball
+  containing the distribution files is created. For  example the
+  tarball filename `myproj_1.0.1.tar.gz` will create a tarball file
+  named `myproj_1.0.1.tar.gz` and all archive file names will be
+  prefixed by `myproj_1.0.1/`.
+- The `TARBALL_FILE` option value must be prefixed with one of the
+  following file name extensions: `.tar.gz`, `.tgz`, `.tar.bz2`. If
+  the file has a `.bz2` extension 'bzip2' compression is used
+  otherwise 'gzip' compression is used.
+- If the `TARBALL_FILE` option value is set to `-` then the default
+  `TARBALL_FILE` configuration parameter value is used, if it is a
+  relative file name then it is assumed relative to the `PROJECT_DIR`.
+
+.Examples
+`dbuilder -c projects/myproject`::
+    Copy project files in `projects/myproject` to distribution
+    directory `projects/myproject/dist` then compile `.py` files to
+    `.pyc` files.
+
+`dbuilder -cjt tarballs/myproject_1.0.1.tar.gz  projects/myproject`::
+    Same as previous example plus copy Django runtime to distribution
+    directory then create a distribution tarball.
+
+`dbuilder -cpji -  projects/myproject`::
+    Marshall and compile distribution containing project files (to
+    `projects/myproject/dist`) along with Python and Django runtimes
+    (to `projects/myproject/dist/python` and
+    `projects/myproject/dist/django` respectively) then create an Inno
+    Setup installer using the `ISS_FILE` configuration parameter.
+
+
+Download
+--------
+The current version is 0.7.0 and a distribution Zip file can be
+downloaded from http://hg.sharesource.org/dbuilder/[]
+
+The 'dbuilder'  Mercurial repository is hosted by
+http://sharesource.org[ShareSource].  ShareSource is a Mercurial
+friendly website for hosting Open Source projects.
+
+To browse the repo go to http://hg.sharesource.org/dbuilder/[].
+
+
+dbuilder and Linux
+------------------
+Although the examples and rationale in this document mostly relate to
+building stand-alone Windows installers 'dbuilder' is not limited to
+the Windows platform -- 'dbuilder'  will quite happily build a
+distribution on Linux with the following caveats:
+
+- The `--iss-file=ISS_FILE` option is specific to Windows, use the
+  `--tarball=TARBALL_FILE` option instead.
+- Most Linux distributions install Python by default so you probably
+  won't want to use the `--python-runtime` option, if you do you will
+  probably only use it to copy non-standard libraries.
+
+Delivering a tarball distribution to Linux platforms will ensure your
+project includes the correct version of Django and that it has all the
+necessary libraries, though your project startup code will need to
+check that a compatible version of the Python interpreter is
+installed.
+
+
+Why
+---
+This project started when I needed to distribute a self contained user
+installable Windows demo of a Django application. My first thought was
+to use 'py2exe' to create a distribution and then package it in a
+setup wizard using the 'Inno Setup compiler' (I had used both tools
+before and they are excellent).
+
+I tried using 'py2exe' but this approach did not work because Django
+dynamically imports modules using the `\__import__` method and because
+of the way Django currently initializes (you will get an `ImportError:
+No module named library.zip` error when you run the 'py2exe' generated
+executable).  These issues have been raised in Django tickets:
+
+- http://code.djangoproject.com/ticket/6013[Django ticket 6013]
+- http://code.djangoproject.com/ticket/5825[Django ticket 5825]
+
+My solution was to side-step automated package build tools and simply
+copy the required Django, Python and project files to a (distribution)
+directory which is then packaged using the Inno Setup compiler.  The
+advantage of this approach is that it is completely transparent -- the
+distributed environment is the identical to the development
+environment, there's no intervening magic and no hidden surprises.
+The drawbacks are:
+
+- The runtime is larger than the optimized and compressed 'py2exe'
+  runtime.  A few extra megabytes is not really a problem relative to
+  modern disk capacities, the larger setup wizard size is mitigated by
+  installer compression.
+- You need to manually configure the files to be included in the
+  distributed application. Using `dbuilder.py` you configure lists of
+  wildcards to include or exclude files from your distribution.
+
+
+How
+---
+First you <<X4,configure dbuilder.py>> to specify the files you want
+in your distribution.
+
+You next run the `dbuilder.py` command:
+
+. The optional `pre_build` function is executed (`pre_build` and
+  `post_build` functions provide hooks for arbitrary Python code to
+  customise distribution assembly).
+. Files specified in the configuration <<X5,match lists>> are copied
+  from the project directory to the distribution directory.  The
+  distribution directory is named `dist` and resides in the project
+  directory, it is automatically created if it does not already exist.
+. If the `--compile` command-line option was specified all Python
+  source files (`.py` files) in the distribution are replaced by
+  compiled `.pyc` files.
+. The optional `post_build` function is executed.
+. If a <<X3,manifest>>  file exists all files in the distribution
+  directory are checked against it.  At this point the distribution
+  assembly is complete and the contents of the distribution directory
+  exactly mirrors the target install directory.
+. If the `--iss-file=ISS_FILE` option is specified the distribution is
+  packaged by the Inno Setup compiler.
+. If the `--tarball=TARBALL_FILE` option is specified as distribution
+  tarball is created.
+
+
+Prerequisites
+-------------
+- Python (I wrote and tested `dbuilder.py` using Python 2.5).
+- Inno Setup compiler if the `--iss-file=ISS_FILE` option is used.
+
+See the <<X1,references>> at the bottom.
+
+
+[[X4]]
+Configuring dbuilder.py
+-----------------------
+The `dbuilder.py` default configuration is customized by editing a
+dbuilder configuration file (default name `dbuilder.conf` in the same
+directory as `dbuilder.py` or set with the `--conf-file` command-line
+option).
+
+A dbuilder configuration file is just Python source code that overrides
+or augments the configuration settings defined in the `dbuilder.py`
+file.
+
+- Edit the following <<X5,match lists>> to reflect the files in your
+  project and you projects Python requirements:
+
+  PROJECT_COPY_FILES
+  DJANGO_COPY_FILES
+  PYTHON_COPY_FILES
++
+TIP: The default match lists in `dbuilder.py` are probably fairly close
+and it's probably easier to simply append to them rather that starting
+from scratch).
+
+- Test your match lists by running `dbuilder.py` with the `--dry-run`
+  command-line option.
+- Check that the source directories for Python and Django runtime
+  files (`PYTHON_DIR` and `DJANGO_DIR` configuration options) are set
+  correctly. If relative path names are used they are relative to the
+  project directory.
+- You should also check the `INNO_SETUP_COMPILER` setting is correct
+  for your Inno Setup install.
+- If you have any non-standard things you need to do pre or post build
+  then implement the `pre_build` and `post_build` functions (see the
+  stubs in `dbuilder.py`).
+
+.`dbuilder.conf` file
+---------------------------------------------------------------------
+PROJECT_COPY_FILES = PROJECT_COPY_FILES + [
+    'doc/myproj.html',
+    '!*settings.py',
+    'settings.py',
+    'win32_settings.py',
+    '!django/*',
+    '!bin/*',
+    'bin/sqlite3.exe',
+    'bin/migration/*',
+    '!bin/migration/data/*',
+    '!*.conf',
+    '!db/*',
+    '!updates/*',
+]
+
+PYTHON_COPY_FILES = PYTHON_COPY_FILES + [
+    'Lib/site-packages/pywin32.pth',
+    'Lib/site-packages/win32/*',
+    '!Lib/site-packages/win32/Demos/*',
+    '!Lib/site-packages/win32/include/*',
+    '!Lib/site-packages/win32/scripts/*',
+    '!Lib/site-packages/win32/test/*',
+]
+
+def post_build():
+    # A couple of files need to be renamed in target distribution.
+    copy_dist_files('db/myproj_demo.db', 'db/myproj_production.db')
+    copy_dist_files('win32_runner.conf', 'runner.conf')
+    # Copy dupdater script from dupdater project directory.
+    copy_dist_files('../../dupdater/trunk/dupdater.pyc', 'bin')
+    # Because updater.py cannot read .pyc files.
+    copy_dist_files('updates/*.py', 'updates')
+---------------------------------------------------------------------
+
+[[X5]]
+Match lists
+~~~~~~~~~~~
+- A match list is an ordered list of path name wildcards (optionally prefixed
+  with a `!` character) and is used to select file for inclusion in
+  the distribution.
+- A path is matched, in order, against all wildcards in the Match
+  list, if a path matches a wildcard it is considered matched unless
+  it is subsequently unmatched by an exclusion (`!` prefixed)
+  wildcard. The final match outcome is determined once all wildcards
+  have been processed.
+- Wildcards conform to the
+  http://docs.python.org/lib/module-fnmatch.html[fnmatch] module's
+  notion of wildcards.
+- Relative wildcards are relative to the copy source directory.
+
+Helpers
+~~~~~~~
+The following helper functions in `dbuilder.py` can be used in
+configuration file `pre_build` and `post_build` functions:
+`expand_path`, `rename_dist_file`, `copy_dist_files`. These functions
+are documented in the `dbuilder.py` source code.
+
+
+[[X3]]
+Manifest functionality
+----------------------
+The `--manifest` option writes a file named `MANIFEST` in the
+distribution directory that contains the relative file names (one per
+line) of all other files in the distribution directory.
+
+Whenever you run `dbuilder.py` to rebuild your project it will compare
+the contents of manifest file to the names of the files in the
+distribution directory -- any differences are printed to stderr.
+Missing files are prefixed with a `-` character, new files are
+prefixed with a `+` character.
+
+Once you've got a working distribution you should create a manifest
+file -- from then on you will always be warned of any discrepancies
+during subsequent builds. If you have added new file or removed old
+one from your distribution refresh the manifest file by rerunning
+dbuilder with the `--manifest` option.
+
+To just check the manifest and exit use the `--check-manifest`
+command-line option -- it will return an exit value of 2 if there are
+any differences.
+
+
+[[X2]]
+Changelog
+---------
+2008-04-08: Version 0.7.0 released:: \
+- 'dbuilder' now hosted at http://sharesource.org[ShareSource].
+- Changed project name from 'builder' to 'dbuilder'.
+- Replaced `--inno-setup` option with `--iss-file=ISS_FILE` option.
+- Normalized `MANIFEST` file entries path separators to UNIX.
+- Build stops if `MANIFEST` file differences are detected.
+- Sorted manifest compare output.
+- `DIST_DIR` configuration file entry now works.
+- Added `copy_dist_files` helper.
+- Added `--tarball=TARBALL_FILE` option.
+- The default configuration file is loaded from the `PROJECT_DIR` not
+  the `builder.py` directory.
+
+2008-02-28: Version 0.6.2 released:: \
+- Added <<X3,manifest functionality>>.
+
+2008-02-26: Version 0.6.1 released:: \
+- Added `pre_build` and `post_build` configuration functions.
+
+2008-02-25: Version 0.6.0 released:: \
+- The `--django-dir=DJANGO_DIR` and `--python-dir=PYTHON_DIR` options
+  have been replaced by `--django-runtime` and `--python-runtime`
+  boolean options. The source directories for Python and Django
+  runtime files are set by the new `PYTHON_DIR` and `DJANGO_DIR`
+  configuration parameters. If relative path names are used they are
+  relative to the project directory.
+- The optional configuration file name has changed from
+  `builder_conf.py` to `builder.conf`.
+
+2008-02-21: Version 0.5.1 released:: \
+- First public release.
+
+
+[[X1]]
+References
+----------
+- http://www.djangoproject.com/[Django web framework]
+- http://python.org/[Python]
+- http://www.jrsoftware.org/isinfo.php[Inno Setup]
+- http://effbot.org/zone/exemaker.htm[exemaker]
+- http://www.py2exe.org/[py2exe]
+- http://cx-freeze.sourceforge.net/[cx_freeze]
+- http://www.instantdjango.com/[Standalone Windows installer]
+- http://thinkhole.org/wp/2006/04/03/django-on-windows-howto/[Article
+  on installing and configuring DAPP (Django, Apache, PostgreSQL and
+  Python) on Windows]
+- http://docs.python.org/lib/module-pycompile.html[Compile Python
+  source files]
+- http://docs.python.org/lib/module-compileall.html[the Python
+  compileall module]
+- http://www.silverstripesoftware.com/blog/archives/51[Deploying a
+  Django app on the desktop]
